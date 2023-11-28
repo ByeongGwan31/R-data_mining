@@ -43,4 +43,122 @@ pred.tree = predict(fit.prun.tree, newdata = prod.test, type = "vector")
 mean((prod.test$productivity - pred.tree)^2)      # MSE
 mean(abs(prod.test$productivity - pred.tree))     # MAE
 
-lib
+# R코드 및 결과 6-4 의류생산성 데이터에 신경망모형 적합 및 예측 결과
+
+library(neuralnet)
+library(dummy)
+
+dvar = c(1:4)         # find nominal variables
+prod2 = dummy(x = prod[,dvar])            # transform nominal variables into dummy
+prod2 = prod2[,-c(5,7,13,25)]             # delete redundant dummy variables
+prod2 = cbind(prod[,-dvar], prod2)        # combine them
+for (i in 1: ncol(prod2)) if(!is.numeric(prod2[,i])) prod2[,i] = as.numeric(prod2[,i])
+
+set.seed(1234)
+
+train.index = sample(1:nrow(prod2), round(0.7 * nrow(prod2)))
+prod2.train = prod2[ train.index, ]       # train data
+prod2.test = prod2[ -train.index, ]       # test data
+
+max1 = apply(prod2.train, 2, max)
+min1 = apply(prod2.train, 2, min)
+
+sdat.train = scale(prod2.train, center = min1, scale = max1 - min1)
+sdat.train = as.data.frame(sdat.train)
+
+sdat.test = scale(prod2.test, center = min1, scale = max1 - min1)
+sdat.test = as.data.frame(sdat.test)
+
+vname = names(sdat.train)
+f = as.formula(paste("productivity ~", paste(vname[!vname %in% "productivity"], collapse = " + ")))
+fit.nn = neuralnet(f, data = sdat.train, hidden = c(3,1), linear.output = T)
+pred.nn = predict(fit.nn, sdat.test)
+pred.nn = pred.nn * (max1[7] - min1[7]) + min1[7]
+
+mean((prod.test$productivity - pred.nn) ^2)     # MSE 평균제곱오차
+mean(abs(prod.test$productivity - pred.nn))     # MAE 평균절대오차
+
+# R 코드 및 결과 6-5 의류생산성 데이터에 랜덤포레스트 적합 및 예측 결과
+library(randomForest)
+
+fit.rf = randomForest(productivity~., data = prod.train, ntree = 100, mtry = 5, importance = T, na.action = na.omit)
+
+pred.rf = predict(fit.rf, newdata = prod.test, type = "response")
+mean((prod.test$productivity - pred.rf) ^2)     # MSE 평균제곱오차
+mean(abs(prod.test$productivity - pred.rf))     # MAE 평균절대오차
+
+# R 코드 및 결과 6-6 의류생산성 데이터의 관측값과 예측값의 산점도 생성
+par(mfrow = c(2,2), pty = "s")
+a = min(prod.test$productivity)
+b = max(prod.test$productivity)
+plot(prod.test$productivity, pred.reg, xlim = c(a,b), ylim =c(a,b), xlab = "Observed", ylab = "Predicted", main = "Regression")
+
+abline(a = 0, b = 1, lty = 2)
+plot(prod.test$productivity, pred.tree, xlim = c(a,b), ylim = c(a,b), xlab = "Observed", ylab = "Predicted", main = "Decision Tree")
+
+abline(a = 0, b = 1, lty = 2)
+plot(prod.test$productivity, pred.nn, xlim = c(a,b), ylim = c(a,b), xlab = "Observed", ylab = "Predicted", main = "Neural Network")
+
+abline(a = 0, b = 1, lty = 2)
+plot(prod.test$productivity, pred.rf, xlim = c(a,b), ylim = c(a,b), xlab = "Observed", ylab = "Predicted", main = "Random Forests")
+
+abline(a = 0, b = 1, lty = 2)
+
+# R 코드 및 결과 6-7 와인품질 데이터 호출 및 데이터 분할
+# Importing data
+wine = read.csv("winequalityCLASS.csv", header = TRUE)
+
+# Determining a cutoff
+cutoff = 0.5
+
+# Partitioning data into train and test sets
+library(caret)
+set.seed(1234)
+train.index = createDataPartition(wine$quality, p = 0.7, list = FALSE)
+wine.train = wine[ train.index, ]           # train data
+wine.test = wine [ -train.index, ]          # test data
+
+# R 코드 및 결과 6-8 와인품질 데이터에 로지스틱회귀모형 적합 및 예측 결과
+fit.reg = glm(quality~., family = binomial(link = "logit"), data = wine.train)
+fit.step.reg = step(fit.reg, direction = "both", trace = FALSE)
+
+p.test.reg = predict(fit.step.reg, newdata = wine.test, type = "response")
+yhat.test.reg = ifelse(p.test.reg > cutoff, 1, 0)
+
+tab = table(wine.test$quality, yhat.test.reg, dnn = c("Observed", "Predicted"))
+print(tab)              # confusion matrix 혼동 행렬
+sum(diag(tab)) / sum(tab)         # acciracy 정확도
+
+tab[2,2] / sum(tab[2,])           # sensitivity 민감도
+
+tab[1,1] / sum(tab[1,])           # specificity 특이도
+
+# R 코드 및 결과 6-9 와인품질 데이터에 의사결정나무모형 적합 및 예측 결과
+library(rpart)
+
+my.control = rpart.control(xval = 10, cp = 0, minsplit = 5)
+fit.tree = rpart(quality~., data = wine.train, method = "class", control = my.control)
+
+tmp = printcp(fit.tree)
+k = which.min(tmp[,"xerror"])
+cp.tmp = tmp[k, "CP"]
+fit.prun.tree = prune(fit.tree, cp = cp.tmp)
+
+p.test.tree = predict(fit.prun.tree, newdata = wine.test, typea = "prob")[,2]
+yhat.test.tree = ifelse(p.test.tree > cutoff, 1, 0)
+
+tab = table(wine.test$quality, yhat.test.tree, dnn = c("Observed", "Predicted"))
+
+print(tab)          # confusion matrix 혼동 행렬
+
+sum(diag(tab)) / sum(tab)       # accuracy 정확도
+
+tab[2,2] / sum(tab[2,])         # sensitivity 민감도
+
+tab[1,1] / sum(tab[1,])         # specificity 특이도
+
+# R 코드 및 결과 6-10 와인품질 데이터에 신경망모형 적합 및 예측 결과
+library(neuralnet)
+library(caret)
+set.seed(1234)
+train.index = c
