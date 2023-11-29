@@ -103,7 +103,6 @@ abline(a = 0, b = 1, lty = 2)
 plot(prod.test$productivity, pred.rf, xlim = c(a,b), ylim = c(a,b), xlab = "Observed", ylab = "Predicted", main = "Random Forests")
 
 abline(a = 0, b = 1, lty = 2)
-<<<<<<< HEAD
 
 # R 코드 및 결과 6-7 와인품질 데이터 호출 및 데이터 분할
 # Importing data
@@ -162,4 +161,139 @@ tab[1,1] / sum(tab[1,])         # specificity 특이도
 library(neuralnet)
 library(caret)
 set.seed(1234)
-train.index = createData
+wine.train = wine[ train.index, ]       # train data
+wine.test = wine[ -train.index, ]       # test data
+
+max1 = apply(wine.train, 2, max)
+min1 = apply(wine.train, 2, min)
+
+gdat.train = scale(wine.train, center = min1, scale = max1 - min1)
+gdat.train = as.data.frame(gdat.train)
+
+gdat.test = scale(wine.test, center = min1, scale = max1 - min1)
+gdat.test = as.data.frame(gdat.test)
+
+gn = names(gdat.train)
+f = as.formula(paste("quality~", paste(gn[!gn %in% "quality"], collapse = " + ")))
+fit.nn = neuralnet(f, data = gdat.train, hidden = c(2,1), linear.output = F)
+p.test.nn = predict(fit.nn, gdat.test)
+yhat.test.nn = ifelse(p.test.nn > cutoff, 1, 0)
+
+tab = table(gdat.test$quality, yhat.test.nn, dnn = c("Observed", "Predicted"))
+print(tab)            # confusion matrix 혼동행렬
+
+sum(diag(tab)) / sum(tab)       # accuracy 정확도
+
+tab[2,2] / sum(tab[2,])         # sensitivity 민감도
+
+tab[1,1] / sum(tab[1,])         # specificity 특이도
+
+# R 코드 및 결과 6-11 와인품질데이터에 배깅모형 적합 및 예측 결과
+library(rpart)
+library(adabag)
+
+if(!is.factor(wine.train$quality)) wine.train$quality = factor (wine.train$quality)
+if(!is.factor(wine.test$quality)) wine.test$quality = factor(wine.test$quality)
+
+my.control = rpart.control(xval = 0, cp = 0, minsplit = 5)
+fit.bag = bagging(quality~., data = wine.train, mfinal = 100, control = my.control)
+
+p.test.bag = predict.bagging(fit.bag, newdata = wine.test)$prob[,2]
+yhat.test.bag = ifelse(p.test.bag > cutoff, levels(wine.test$quality)[2], levels(wine.test$quality)[1])
+
+tab = table(wine.test$quality, yhat.test.bag, dnn = c("Observerd", "Predicted"))
+
+print(tab)          # confusion matrix
+
+sum(diag(tab)) / sum(tab)       # accuracy 정확도
+
+tab[2,2] / sum(tab[2,])         # sensitivity 민감도
+
+tab[1,1] / sum(tab[1,])         # specificity 특이도
+
+# R 코드 및 결과 6-12 : 와인품질 데이터에 부스팅모형 적합 및 예측 결과
+library(rpart)
+library(adabag)
+
+if(!is.factor(wine.train$quality)) wine.train$quality = factor(wine.train$quality)
+if(!is.factor(wine.test$quality)) wine.test$quality = factor(wine.test$quality)
+
+my.control = rpart.control(xval = 0, cp = 0, maxdepth = 4)
+fit.boo = boosting(quality~., data = wine.train, boos = T, mfinal = 100, control = my.control)
+
+p.test.boo = predict.boosting(fit.boo, newdata = wine.test)$prob[,2]
+yhat.test.boo = ifelse(p.test.boo > cutoff, levels(wine.test$quality)[2], levels(wine.test$quality)[1])
+
+tab = table(wine.test$quality, yhat.test.boo, dnn = c("Observed", "Predicted"))
+
+print(tab)          # confusion matrix
+
+sum(diag(tab)) / sum(tab)       # accuracy 정확도
+
+tab[2,2] / sum(tab[2,])         # sensitivity 민감도
+
+tab[1,1] / sum(tab[1,])         # specificity 특이도      
+
+# R 코드 6-13 와인품질 데이터에 랜덤포레스트모형 적합 및 예측 결과
+library(randomForest)
+
+if(!is.factor(wine.train$quality)) wine.train$quality = factor(wine.train$quality)
+if(!is.factor(wine.test$quality)) wine.test$quality = factor(wine.test$quality)
+
+fit.rf = randomForest(quality~., data = wine.train, ntree = 100, mtry =5, importance = T, na.action = na.omit)
+
+p.test.rf = predict(fit.rf, newdata = wine.test, type = "prob")[,2]
+yhat.test.rf = ifelse(p.test.rf > cutoff, levels(wine.test$quality)[2], levels(wine.test$quality)[1])
+
+tab = table(wine.test$quality, yhat.test.rf, dnn = c("Observed", "Predicted"))
+
+print(tab)          # confusion matrix
+
+sum(diag(tab)) / sum(tab)       # accuracy 정확도
+
+tab[2,2] / sum(tab[2,])         # sensitivity 민감도
+
+tab[1,1] / sum(tab[1,])         # specificity 특이도     
+
+# R 코드 및 결과 6-14 와인품질 데이터에 ROC 및 AUC 예측 결과
+install.packages("ROCR")
+library(ROCR)
+
+# Making predictions
+pred.reg = prediction(p.test.reg, wine.test$quality)
+perf.reg = performance(pred.reg, "tpr", "fpr")
+
+pred.tree = prediction(p.test.tree, wine.test$quality)
+perf.tree = performance(pred.tree, "tpr", "fpr")
+
+pred.nn = prediction(p.test.nn, wine.test$quality)
+perf.nn = performance(pred.nn, "tpr", "fpr")
+
+pred.bag = prediction(p.test.bag, wine.test$quality)
+perf.bag = performance(pred.bag, "tpr", "fpr")
+
+pred.boo = prediction(p.test.boo, wine.test$quality)
+perf.boo = performance(pred.boo, "tpr", "fpr")
+
+pred.rf = prediction(p.test.rf, wine.test$quality)
+perf.rf = performance(pred.rf, "tpr", "fpr")
+
+# Drawing ROCs
+plot(perf.reg, lty = 1, col = 1, xlim = c(0,1), ylim = c(0,1),
+     xlab = "1-Specificity", ylab = "Sensitivity", main = "ROC Curve")
+
+plot(perf.tree, lty = 2, col = 2, add = TRUE)
+plot(perf.nn, lty = 3, col = 3, add = TRUE)
+plot(perf.bag, lty = 4, col = 4, add = TRUE)
+plot(perf.boo, lty = 5, col = 5, add = TRUE)
+plot(perf.rf, lty = 6, col = 6, add = TRUE)
+lines(x = c(0, 1), y = c(0, 1), col = "grey")
+legend(0.6, 0.3, c("Regression", "Decision Tree", "Neural Network", "Bagging", "Boosting", "Random Forest"), lty = 1:6, col = 1:6)
+
+# Computing AUCs
+performance(pred.reg, "auc")@y.values     # Regression 로지스틱 회귀모형
+performance(pred.tree, "auc")@y.values    # Decision Tree 분류나무모형
+performance(pred.nn, "auc")@y.values      # Neural Network 신경망모형
+performance(pred.bag, "auc")@y.values     # Bagging 배깅
+performance(pred.boo, "auc")@y.values     # Boosting 
+performance(pred.rf, "auc")@y.values      # Random Forest
