@@ -103,6 +103,7 @@ abline(a = 0, b = 1, lty = 2)
 plot(prod.test$productivity, pred.rf, xlim = c(a,b), ylim = c(a,b), xlab = "Observed", ylab = "Predicted", main = "Random Forests")
 
 abline(a = 0, b = 1, lty = 2)
+<<<<<<< HEAD
 
 # R 코드 및 결과 6-7 와인품질 데이터 호출 및 데이터 분할
 # Importing data
@@ -161,4 +162,4 @@ tab[1,1] / sum(tab[1,])         # specificity 특이도
 library(neuralnet)
 library(caret)
 set.seed(1234)
-train.index = c
+train.index = createData
