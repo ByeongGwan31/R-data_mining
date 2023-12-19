@@ -39,3 +39,22 @@ dim(state.x77)
 summary(state.x77)
 
 statescale <- data.frame(scale(state.x77, center = TRUE, scale = TRUE))
+
+# R 코드 및 결과 7-7 계층적 군집분석 (state.x77 데이터)
+sclustering1 = hclust(dist(statescale), method = "single")
+sclustering2 = hclust(dist(statescale), method = "complete")
+sclustering3 = hclust(dist(statescale), method = "average")
+
+library(cluster)
+sdianaclustering = diana(statescale)
+
+plot(sclustering1)
+plot(sclustering2)
+plot(sclustering3)
+
+plot(sdianaclustering)
+
+# R 코드 및 결과 7-8 K-평균 군집분석 결과
+install = tapply(statescale, list(rep(cutree(sclustering3, 4), + ncol(statescale)), col(statescale)), mean)
+skmclustering = kmeans(statescale, initial, algorithm = "MacQueen")
+skmclustering
